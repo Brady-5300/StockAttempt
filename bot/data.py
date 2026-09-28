@@ -18,8 +18,13 @@ UNIVERSE = [
 ]
 CASH = "SHY"
 
+# Downloaded but not part of the rotation universe. SSO is a 2x daily S&P 500
+# ETF, used to get leverage without a margin account (its fees and financing
+# costs are already baked into its price history).
+EXTRA = ["SSO"]
 
-def load_prices(tickers=UNIVERSE, start="2005-01-01", refresh=False) -> pd.DataFrame:
+
+def load_prices(tickers=UNIVERSE + EXTRA, start="2005-01-01", refresh=False) -> pd.DataFrame:
     """Split/dividend-adjusted daily closes, one column per ticker."""
     if CACHE.exists() and not refresh:
         prices = pd.read_csv(CACHE, index_col=0, parse_dates=True)

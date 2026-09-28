@@ -20,7 +20,18 @@ GRIDS = {
         "lookback": [63, 126, 252], "top_n": [2, 3, 5], "rebalance": [5, 21]}),
     "mean_reversion": (strategies.mean_reversion, {
         "lookback": [3, 5, 10], "top_n": [2, 3, 5], "rebalance": [3, 5]}),
+    "trend_momentum": (strategies.trend_momentum, {
+        "sma": [150, 200], "lookback": [126, 252], "top_n": [3, 5],
+        "rebalance": [5, 21]}),
+    "leveraged_trend": (strategies.leveraged_trend, {
+        "sma": [100, 150, 200], "leverage": [1.0, 1.25, 1.5, 1.75, 2.0],
+        "rebalance": [5]}),
 }
+
+# Sharpe barely changes with leverage, so picking by Sharpe can't choose a
+# leverage level. For these, pick the highest return whose training-period
+# volatility is no higher than SPY's, i.e. "more return for the same risk".
+RISK_MATCHED = {"leveraged_trend"}
 
 
 def evaluate(prices, fn, params, period):
@@ -51,7 +62,8 @@ def main():
 
     header = f"{'':{W}}{'CAGR':>7} {'Vol':>6} {'Sharpe':>6} {'MaxDD':>7} {'Turn':>8}   t vs SPY"
     chosen = {}
-    print("TRAINING PERIOD (settings chosen by best Sharpe)")
+    print("TRAINING PERIOD (settings chosen here; leveraged_trend by best "
+          "return at <= SPY's risk, the rest by best Sharpe)")
     print(header)
     print(f"{'SPY buy & hold':{W}}{fmt(backtest.metrics(bench_train))}")
     for name, (fn, grid) in GRIDS.items():
@@ -60,7 +72,12 @@ def main():
             params = dict(zip(grid.keys(), combo))
             r = evaluate(prices, fn, params, TRAIN)
             results.append((params, backtest.metrics(r), r))
-        params, m, r = max(results, key=lambda res: res[1]["Sharpe"])
+        if name in RISK_MATCHED:
+            spy_vol = backtest.metrics(bench_train)["Vol"]
+            allowed = [res for res in results if res[1]["Vol"] <= spy_vol]
+            params, m, r = max(allowed, key=lambda res: res[1]["CAGR"])
+        else:
+            params, m, r = max(results, key=lambda res: res[1]["Sharpe"])
         chosen[name] = params
         t = backtest.excess_tstat(r, bench_train)
         print(f"{name + ' ' + str(params):{W}}{fmt(m)}   {t:5.2f}")
