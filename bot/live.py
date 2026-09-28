@@ -207,3 +207,42 @@ def run(dry_run=False, allow_live=False, force=False):
         "signal": signal, "equity": round(equity, 2),
         "orders": "; ".join(results if not dry_run else map(str, orders)),
     })
+
+
+def run_forever(allow_live=False, dry_run=False):
+    """Trade right away, then again as soon as each new trading day opens.
+    Turning it off (Ctrl+C or closing the window) stops it instantly and
+    leaves the positions it holds in place."""
+    key, secret, paper = load_keys()
+    if not paper and not allow_live:
+        raise SystemExit("ALPACA_PAPER=false points at real money. Refusing unless "
+                         "you also pass --live.")
+    trading = TradingClient(key, secret, paper=paper)
+    print(f"Bot is ON ({'paper' if paper else 'LIVE'}).")
+    print("To turn it off: press Ctrl+C or close this window. "
+          "Its positions stay in the account.\n")
+
+    last_trade_day = None
+    last_message = ""
+    while True:
+        try:
+            clock = cast(Clock, trading.get_clock())
+            now = clock.timestamp.astimezone(NY)
+            if clock.is_open and last_trade_day != now.date():
+                print(f"--- {now:%a %b %d %I:%M %p} ET ---")
+                run(allow_live=allow_live, dry_run=dry_run)
+                print()
+                last_trade_day = now.date()
+                continue
+            wake = clock.next_open.astimezone(NY)
+            reason = "Done for today" if clock.is_open else "Market is closed"
+            message = f"{reason}. Next trade check at the open, {wake:%a %b %d %I:%M %p} ET."
+            wait = (wake - now).total_seconds()
+        except Exception as e:  # network blips etc.: report and retry, don't die
+            message = f"Error: {e}. Retrying in 5 minutes."
+            wait = 300
+        if message != last_message:
+            print(message)
+            last_message = message
+        # Re-check at least hourly, in case the PC slept or the clock jumped.
+        time.sleep(max(5.0, min(wait, 3600)))

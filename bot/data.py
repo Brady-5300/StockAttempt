@@ -20,8 +20,9 @@ CASH = "SHY"
 
 # Downloaded but not part of the rotation universe. SSO is a 2x daily S&P 500
 # ETF, used to get leverage without a margin account (its fees and financing
-# costs are already baked into its price history).
-EXTRA = ["SSO"]
+# costs are already baked into its price history). RSP is an equal-weight
+# S&P 500 ETF, used to measure survivorship bias in the stock backtests.
+EXTRA = ["SSO", "RSP"]
 
 
 def load_prices(tickers=UNIVERSE + EXTRA, start="2005-01-01", refresh=False) -> pd.DataFrame:

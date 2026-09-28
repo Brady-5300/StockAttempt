@@ -64,6 +64,34 @@ def leveraged_trend(prices, sma=150, leverage=1.5, cash=CASH):
     return _with_cash(w, cash)
 
 
+def _spread_evenly(picks: pd.DataFrame) -> pd.DataFrame:
+    counts = picks.sum(axis=1)
+    return picks.div(counts.where(counts > 0), axis=0).fillna(0.0)
+
+
+def equal_weight_index(prices, members):
+    """Every S&P 500 member we have a price for, equal weight. Compared with
+    RSP (the real equal-weight ETF) it shows how much missing data flatters us."""
+    picks = (members & prices[members.columns].notna()).astype(float)
+    return _spread_evenly(picks)
+
+
+def stock_momentum(prices, members, lookback=252, skip=21, top_n=20,
+                   trend_sma=0, cash=CASH):
+    """Hold the top_n S&P 500 members by past return (skipping the latest
+    month), equal weight. Only stocks in the index on that date qualify.
+    With trend_sma > 0, go to cash while SPY is below that moving average."""
+    p = prices[members.columns]
+    mom = (p.shift(skip) / p.shift(lookback) - 1).where(members & p.notna())
+    picks = (mom.rank(axis=1, ascending=False) <= top_n).astype(float)
+    w = _spread_evenly(picks)
+    if trend_sma:
+        above = prices["SPY"] > prices["SPY"].rolling(trend_sma).mean()
+        w = w.mul(above.astype(float), axis=0)
+    w[cash] = 1.0 - w.sum(axis=1)
+    return w
+
+
 def trend_momentum(prices, sma=150, lookback=252, top_n=5, trend_share=0.5, cash=CASH):
     """Split the money between the trend and momentum strategies. They did
     well in different years, so together the ride should be smoother."""

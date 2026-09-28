@@ -1,7 +1,8 @@
-"""Run the trading bot once. Meant to be scheduled daily near the close.
+"""Run the trading bot.
 
-    python trade.py --dry-run   # show what it would do, place no orders
-    python trade.py             # trade on the paper account
+    python trade.py --loop      # turn the bot ON: trades now, then every trading day
+    python trade.py --dry-run   # show what it would do right now, place no orders
+    python trade.py             # check and trade once, right now
 """
 import argparse
 
@@ -16,8 +17,16 @@ def main():
                         help="submit orders even while the market is closed (they fill at the next open)")
     parser.add_argument("--live", action="store_true",
                         help="allow real-money trading when ALPACA_PAPER=false")
+    parser.add_argument("--loop", action="store_true",
+                        help="keep running and trade once each trading day before the close")
     args = parser.parse_args()
-    live.run(dry_run=args.dry_run, allow_live=args.live, force=args.force)
+    if args.loop:
+        try:
+            live.run_forever(allow_live=args.live, dry_run=args.dry_run)
+        except KeyboardInterrupt:
+            print("\nBot is OFF.")
+    else:
+        live.run(dry_run=args.dry_run, allow_live=args.live, force=args.force)
 
 
 if __name__ == "__main__":
